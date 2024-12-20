@@ -28,8 +28,19 @@ CURRENT_PORT = None
 SPOTIFY_SCOPES = 'user-read-recently-played user-follow-read playlist-modify-public playlist-read-private playlist-modify-private'
 
 def get_redirect_uri():
-    if os.getenv('PYTHONANYWHERE_DOMAIN'):
-        return f'https://{os.getenv("PYTHONANYWHERE_DOMAIN")}/callback'
+    # Check for explicit PythonAnywhere domain
+    pythonanywhere_domain = os.getenv('PYTHONANYWHERE_DOMAIN')
+    if pythonanywhere_domain:
+        return f'https://{pythonanywhere_domain}/callback'
+    
+    # Check for other environment variables
+    if os.getenv('REDIRECT_URI'):
+        return os.getenv('REDIRECT_URI')
+    
+    # Fallback to localhost
+    global CURRENT_PORT
+    if CURRENT_PORT is None:
+        CURRENT_PORT = DEFAULT_PORT
     return f'http://localhost:{CURRENT_PORT}/callback'
 
 def create_spotify_oauth():
