@@ -112,7 +112,7 @@ def get_playlists():
         
         return jsonify({'success': True, 'playlists': playlists})
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)})
+        return jsonify({'success': False, 'error': f"get playlists error: {str(e)}"})
 
 @app.route('/get-releases', methods=['POST'])
 def get_releases():
@@ -126,7 +126,7 @@ def get_releases():
         releases = get_recent_releases(sp, weeks_back, album_types)
         return jsonify({'success': True, 'releases': releases})
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)})
+        return jsonify({'success': False, 'error': f"get releases error: {str(e)}"})
 
 @app.route('/create-playlist', methods=['POST'])
 def make_playlist():
@@ -140,7 +140,7 @@ def make_playlist():
         playlist_url = create_playlist(sp, track_ids, weeks_back, playlist_name, playlist_id)
         return jsonify({'success': True, 'playlistUrl': playlist_url})
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)})
+        return jsonify({'success': False, 'error': f"create playlist error: {str(e)}"})
 
 def create_playlist(sp, track_ids, weeks_back, playlist_name=None, playlist_id=None):
     """Create a new playlist or update existing one with tracks"""
