@@ -6,6 +6,11 @@ from datetime import datetime, timedelta
 from dotenv import load_dotenv
 import socket
 import secrets
+import logging
+
+# Configure logging
+logging.basicConfig(filename='spotify_auth.log', level=logging.DEBUG, 
+                    format='%(asctime)s - %(levelname)s - %(message)s')
 
 load_dotenv()
 
@@ -31,23 +36,36 @@ def get_redirect_uri():
     # Check for explicit PythonAnywhere domain
     pythonanywhere_domain = os.getenv('PYTHONANYWHERE_DOMAIN')
     if pythonanywhere_domain:
-        return f'https://{pythonanywhere_domain}/callback'
+        redirect_uri = f'https://{pythonanywhere_domain}/callback'
+        logging.info(f"PythonAnywhere Redirect URI: {redirect_uri}")
+        return redirect_uri
     
     # Check for other environment variables
     if os.getenv('REDIRECT_URI'):
-        return os.getenv('REDIRECT_URI')
+        redirect_uri = os.getenv('REDIRECT_URI')
+        logging.info(f"Explicit Redirect URI: {redirect_uri}")
+        return redirect_uri
     
     # Fallback to localhost
     global CURRENT_PORT
     if CURRENT_PORT is None:
         CURRENT_PORT = DEFAULT_PORT
-    return f'http://localhost:{CURRENT_PORT}/callback'
+    
+    redirect_uri = f'http://localhost:{CURRENT_PORT}/callback'
+    logging.info(f"Localhost Redirect URI: {redirect_uri}")
+    return redirect_uri
 
 def create_spotify_oauth():
+    redirect_uri = get_redirect_uri()
+    logging.info(f"Creating SpotifyOAuth with:")
+    logging.info(f"Client ID: {SPOTIPY_CLIENT_ID}")
+    logging.info(f"Redirect URI: {redirect_uri}")
+    logging.info(f"Scopes: {SPOTIFY_SCOPES}")
+    
     return SpotifyOAuth(
         client_id=SPOTIPY_CLIENT_ID,
         client_secret=SPOTIPY_CLIENT_SECRET,
-        redirect_uri=get_redirect_uri(),
+        redirect_uri=redirect_uri,
         scope=SPOTIFY_SCOPES,
         cache_path=None  # Don't use file cache
     )
@@ -69,7 +87,7 @@ def get_spotify_client():
 
         return spotipy.Spotify(auth=token_info['access_token'])
     except Exception as e:
-        print(f"Error getting Spotify client: {e}")
+        logging.error(f"Error getting Spotify client: {e}")
         session.pop('token_info', None)
         return None
 
@@ -83,16 +101,25 @@ def index():
 def login():
     sp_oauth = create_spotify_oauth()
     auth_url = sp_oauth.get_authorize_url()
+    logging.info(f"Generated Authorization URL: {auth_url}")
     return redirect(auth_url)
 
 @app.route('/callback')
 def callback():
+    logging.info("Callback route hit")
     sp_oauth = create_spotify_oauth()
     session.clear()
     code = request.args.get('code')
-    token_info = sp_oauth.get_access_token(code)
-    session['token_info'] = token_info
-    return redirect('/')
+    logging.info(f"Received code: {code}")
+    
+    try:
+        token_info = sp_oauth.get_access_token(code)
+        logging.info("Token retrieved successfully")
+        session['token_info'] = token_info
+        return redirect('/')
+    except Exception as e:
+        logging.error(f"Error in callback: {str(e)}")
+        return f"Authentication failed: {str(e)}", 400
 
 @app.route('/logout')
 def logout():
