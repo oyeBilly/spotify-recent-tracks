@@ -194,4 +194,4 @@ if __name__ == '__main__':
     
     print(f"Starting server on port {available_port}")
     print(f"Please ensure {get_redirect_uri()} is added to your Spotify app's redirect URIs")
-    app.run(debug=True, port=available_port)
+    app.run(debug=True, host='0.0.0.0', port=available_port)
