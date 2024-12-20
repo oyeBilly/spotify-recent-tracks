@@ -38,14 +38,50 @@
                            class="w-full px-4 py-2 rounded bg-gray-700 border border-gray-600 focus:outline-none focus:border-green-500">
                 </div>
 
+                <div class="mb-6">
+                    <label class="block text-sm font-medium mb-2">Include release types:</label>
+                    <div class="space-y-2">
+                        <label class="flex items-center space-x-2">
+                            <input type="checkbox" id="typeAlbum" checked
+                                   class="w-4 h-4 rounded bg-gray-700 border-gray-600 text-green-500 focus:ring-green-500 focus:ring-offset-gray-800">
+                            <span>Albums</span>
+                        </label>
+                        <label class="flex items-center space-x-2">
+                            <input type="checkbox" id="typeSingle" checked
+                                   class="w-4 h-4 rounded bg-gray-700 border-gray-600 text-green-500 focus:ring-green-500 focus:ring-offset-gray-800">
+                            <span>Singles</span>
+                        </label>
+                        <label class="flex items-center space-x-2">
+                            <input type="checkbox" id="typeCompilation" checked
+                                   class="w-4 h-4 rounded bg-gray-700 border-gray-600 text-green-500 focus:ring-green-500 focus:ring-offset-gray-800">
+                            <span>Compilations</span>
+                        </label>
+                    </div>
+                </div>
+
                 <div class="flex space-x-4 mb-6">
                     <button id="getTracksBtn" class="flex-1 spotify-green text-white px-6 py-2 rounded-full font-medium hover:shadow-lg transition duration-200">
                         Get Track List
                     </button>
-                    <button id="createPlaylistBtn" disabled 
-                            class="flex-1 bg-gray-600 text-gray-300 px-6 py-2 rounded-full font-medium transition duration-200 disabled:opacity-50 disabled:cursor-not-allowed">
-                        Create Playlist
-                    </button>
+                </div>
+
+                <div id="playlistSection" class="mb-6 hidden">
+                    <div class="flex items-center space-x-4">
+                        <select id="playlistSelect" 
+                                class="flex-1 px-4 py-2 rounded bg-gray-700 border border-gray-600 focus:outline-none focus:border-green-500">
+                            <option value="new">Create New Playlist</option>
+                        </select>
+                        <button id="updatePlaylistBtn" 
+                                class="spotify-green text-white px-6 py-2 rounded-full font-medium hover:shadow-lg transition duration-200">
+                            Update Playlist
+                        </button>
+                    </div>
+                    
+                    <div id="newPlaylistNameContainer" class="mt-4">
+                        <input type="text" id="newPlaylistName" 
+                               placeholder="Enter new playlist name"
+                               class="w-full px-4 py-2 rounded bg-gray-700 border border-gray-600 focus:outline-none focus:border-green-500">
+                    </div>
                 </div>
 
                 <div id="results" class="space-y-4"></div>
@@ -56,10 +92,17 @@
     <script>
         let trackIds = [];
         const getTracksBtn = document.getElementById('getTracksBtn');
-        const createPlaylistBtn = document.getElementById('createPlaylistBtn');
+        const updatePlaylistBtn = document.getElementById('updatePlaylistBtn');
+        const playlistSelect = document.getElementById('playlistSelect');
+        const newPlaylistName = document.getElementById('newPlaylistName');
+        const playlistSection = document.getElementById('playlistSection');
+        const newPlaylistNameContainer = document.getElementById('newPlaylistNameContainer');
         const resultsDiv = document.getElementById('results');
         const messageContainer = document.getElementById('messageContainer');
         const weeksInput = document.getElementById('weeks');
+        const typeAlbumCheckbox = document.getElementById('typeAlbum');
+        const typeSingleCheckbox = document.getElementById('typeSingle');
+        const typeCompilationCheckbox = document.getElementById('typeCompilation');
 
         function showMessage(message, type = 'success') {
             const messageDiv = document.createElement('div');
@@ -80,13 +123,59 @@
             window.scrollTo({ top: 0, behavior: 'smooth' });
         }
 
+        function getSelectedAlbumTypes() {
+            const types = [];
+            if (typeAlbumCheckbox.checked) types.push('album');
+            if (typeSingleCheckbox.checked) types.push('single');
+            if (typeCompilationCheckbox.checked) types.push('compilation');
+            return types;
+        }
+
+        function validateForm() {
+            const types = getSelectedAlbumTypes();
+            if (types.length === 0) {
+                showMessage('Please select at least one release type.', 'error');
+                return false;
+            }
+            return true;
+        }
+
+        // Load playlists when page loads
+        async function loadPlaylists() {
+            try {
+                const response = await fetch('/get-playlists');
+                const data = await response.json();
+                
+                if (data.success) {
+                    data.playlists.forEach(playlist => {
+                        const option = document.createElement('option');
+                        option.value = playlist.id;
+                        option.textContent = `${playlist.name} (${playlist.tracks_total} tracks)`;
+                        playlistSelect.appendChild(option);
+                    });
+                }
+            } catch (error) {
+                console.error('Error loading playlists:', error);
+            }
+        }
+        
+        loadPlaylists();
+
+        // Show/hide new playlist name input based on selection
+        playlistSelect.addEventListener('change', () => {
+            newPlaylistNameContainer.style.display = 
+                playlistSelect.value === 'new' ? 'block' : 'none';
+        });
+
         getTracksBtn.addEventListener('click', async () => {
             try {
+                if (!validateForm()) return;
+
                 getTracksBtn.disabled = true;
                 getTracksBtn.textContent = 'Loading...';
                 resultsDiv.innerHTML = '';
                 messageContainer.innerHTML = '';
-                createPlaylistBtn.disabled = true;
+                playlistSection.classList.add('hidden');
                 trackIds = [];
 
                 const response = await fetch('/get-releases', {
@@ -95,43 +184,54 @@
                         'Content-Type': 'application/json',
                     },
                     body: JSON.stringify({
-                        weeks: parseInt(weeksInput.value)
+                        weeks: parseInt(weeksInput.value),
+                        albumTypes: getSelectedAlbumTypes()
                     })
                 });
 
                 const data = await response.json();
                 
                 if (data.success) {
-                    trackIds = data.releases.map(release => release.top_track.id);
+                    trackIds = data.releases
+                        .filter(release => getSelectedAlbumTypes().includes(release.album_type))
+                        .map(release => release.top_track.id);
                     
                     if (data.releases.length === 0) {
                         showMessage('No new releases found in the specified time period.', 'error');
                     } else {
-                        data.releases.forEach(release => {
-                            const releaseDiv = document.createElement('div');
-                            releaseDiv.className = 'bg-gray-700 p-4 rounded-lg';
-                            releaseDiv.innerHTML = `
-                                <div class="flex justify-between items-start">
-                                    <div>
-                                        <h3 class="font-semibold text-lg">${release.artist_name}</h3>
-                                        <p class="text-green-400">${release.album_name}</p>
-                                        <p class="text-sm text-gray-400">Released: ${release.release_date}</p>
-                                        <p class="text-sm mt-2">Top Track: ${release.top_track.name}</p>
+                        const filteredReleases = data.releases.filter(release => 
+                            getSelectedAlbumTypes().includes(release.album_type)
+                        );
+                        
+                        if (filteredReleases.length === 0) {
+                            showMessage('No releases found for the selected types.', 'error');
+                        } else {
+                            filteredReleases.forEach(release => {
+                                const releaseDiv = document.createElement('div');
+                                releaseDiv.className = 'bg-gray-700 p-4 rounded-lg';
+                                releaseDiv.innerHTML = `
+                                    <div class="flex justify-between items-start">
+                                        <div>
+                                            <h3 class="font-semibold text-lg">${release.artist_name}</h3>
+                                            <p class="text-green-400">${release.album_name}</p>
+                                            <p class="text-sm text-gray-400">Released: ${release.release_date}</p>
+                                            <p class="text-sm text-gray-400">Type: ${release.album_type.charAt(0).toUpperCase() + release.album_type.slice(1)}</p>
+                                            <p class="text-sm mt-2">Top Track: ${release.top_track.name}</p>
+                                        </div>
+                                        <a href="${release.url}" target="_blank" 
+                                           class="text-green-400 hover:text-green-300 text-sm">
+                                            Open in Spotify
+                                        </a>
                                     </div>
-                                    <a href="${release.url}" target="_blank" 
-                                       class="text-green-400 hover:text-green-300 text-sm">
-                                        Open in Spotify
-                                    </a>
-                                </div>
-                            `;
-                            resultsDiv.appendChild(releaseDiv);
-                        });
-                    }
-
-                    if (trackIds.length > 0) {
-                        createPlaylistBtn.disabled = false;
-                        createPlaylistBtn.classList.remove('bg-gray-600', 'text-gray-300');
-                        createPlaylistBtn.classList.add('spotify-green', 'text-white', 'hover:shadow-lg');
+                                `;
+                                resultsDiv.appendChild(releaseDiv);
+                            });
+                            
+                            // Show playlist section if we have tracks
+                            if (trackIds.length > 0) {
+                                playlistSection.classList.remove('hidden');
+                            }
+                        }
                     }
                 } else {
                     showMessage(`Error: ${data.error}`, 'error');
@@ -144,10 +244,18 @@
             }
         });
 
-        createPlaylistBtn.addEventListener('click', async () => {
+        updatePlaylistBtn.addEventListener('click', async () => {
             try {
-                createPlaylistBtn.disabled = true;
-                createPlaylistBtn.textContent = 'Creating...';
+                const playlistId = playlistSelect.value === 'new' ? null : playlistSelect.value;
+                const playlistName = playlistId ? null : newPlaylistName.value.trim();
+                
+                if (!playlistId && !playlistName) {
+                    showMessage('Please enter a name for the new playlist.', 'error');
+                    return;
+                }
+
+                updatePlaylistBtn.disabled = true;
+                updatePlaylistBtn.textContent = 'Updating...';
 
                 const response = await fetch('/create-playlist', {
                     method: 'POST',
@@ -156,7 +264,9 @@
                     },
                     body: JSON.stringify({
                         trackIds: trackIds,
-                        weeks: parseInt(weeksInput.value)
+                        weeks: parseInt(weeksInput.value),
+                        playlistId: playlistId,
+                        playlistName: playlistName
                     })
                 });
 
@@ -165,7 +275,7 @@
                 if (data.success) {
                     showMessage(`
                         <div class="flex justify-between items-center">
-                            <span>Playlist created successfully!</span>
+                            <span>${playlistId ? 'Playlist updated' : 'New playlist created'} successfully!</span>
                             <a href="${data.playlistUrl}" target="_blank" 
                                class="text-green-400 hover:text-green-300 ml-4">
                                 Open in Spotify →
@@ -173,13 +283,13 @@
                         </div>
                     `, 'success');
                 } else {
-                    showMessage(`Error creating playlist: ${data.error}`, 'error');
+                    showMessage(`Error: ${data.error}`, 'error');
                 }
             } catch (error) {
                 showMessage(`Error: ${error.message}`, 'error');
             } finally {
-                createPlaylistBtn.disabled = false;
-                createPlaylistBtn.textContent = 'Create Playlist';
+                updatePlaylistBtn.disabled = false;
+                updatePlaylistBtn.textContent = 'Update Playlist';
             }
         });
     </script>

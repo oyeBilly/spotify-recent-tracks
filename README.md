@@ -24,3 +24,7 @@ python3 recent_track.py
 ```
 
 The first time you run the script, it will open a web browser for authentication. After authenticating, the script will show your most recently played track along with its audio features and genre tags.
+
+
+# Feature Map
+- ability to create a new playlist or update an existing playlist with the most played tracks from albums released in the last X weeks
