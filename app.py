@@ -1,18 +1,16 @@
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, redirect, session, url_for
 import spotipy
 from spotipy.oauth2 import SpotifyOAuth
 import os
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
 import socket
-
-global CURRENT_PORT
-DEFAULT_PORT = 5000
-CURRENT_PORT = None  # Will be set when the server starts
+import secrets
 
 load_dotenv()
 
 app = Flask(__name__)
+app.secret_key = secrets.token_hex(16)
 
 # Spotify API credentials
 SPOTIPY_CLIENT_ID = os.getenv('SPOTIPY_CLIENT_ID')
@@ -23,18 +21,129 @@ if SPOTIPY_CLIENT_ID is None:
 
 if SPOTIPY_CLIENT_SECRET is None:
     print("Please set SPOTIPY_CLIENT_SECRET environment variable")
-DEFAULT_PORT = 5000
 
-def get_redirect_uri(port=DEFAULT_PORT):
+DEFAULT_PORT = 5000
+CURRENT_PORT = None
+
+SPOTIFY_SCOPES = 'user-read-recently-played user-follow-read playlist-modify-public playlist-read-private playlist-modify-private'
+
+def get_redirect_uri():
+    if os.getenv('PYTHONANYWHERE_DOMAIN'):
+        return f'https://{os.getenv("PYTHONANYWHERE_DOMAIN")}/callback'
     return f'http://localhost:{CURRENT_PORT}/callback'
 
-def get_spotify_client():
-    return spotipy.Spotify(auth_manager=SpotifyOAuth(
+def create_spotify_oauth():
+    return SpotifyOAuth(
         client_id=SPOTIPY_CLIENT_ID,
         client_secret=SPOTIPY_CLIENT_SECRET,
         redirect_uri=get_redirect_uri(),
-        scope='user-read-recently-played user-follow-read playlist-modify-public playlist-read-private playlist-modify-private'
-    ))
+        scope=SPOTIFY_SCOPES,
+        cache_path=None  # Don't use file cache
+    )
+
+def get_spotify_client():
+    if not session.get('token_info'):
+        return None
+    
+    try:
+        token_info = session['token_info']
+        # Check if token needs refresh
+        now = int(datetime.now().timestamp())
+        is_expired = token_info['expires_at'] - now < 60
+
+        if is_expired:
+            sp_oauth = create_spotify_oauth()
+            token_info = sp_oauth.refresh_access_token(token_info['refresh_token'])
+            session['token_info'] = token_info
+
+        return spotipy.Spotify(auth=token_info['access_token'])
+    except Exception as e:
+        print(f"Error getting Spotify client: {e}")
+        session.pop('token_info', None)
+        return None
+
+@app.route('/')
+def index():
+    if not session.get('token_info'):
+        return render_template('index.html', authenticated=False)
+    return render_template('index.html', authenticated=True)
+
+@app.route('/login')
+def login():
+    sp_oauth = create_spotify_oauth()
+    auth_url = sp_oauth.get_authorize_url()
+    return redirect(auth_url)
+
+@app.route('/callback')
+def callback():
+    sp_oauth = create_spotify_oauth()
+    session.clear()
+    code = request.args.get('code')
+    token_info = sp_oauth.get_access_token(code)
+    session['token_info'] = token_info
+    return redirect('/')
+
+@app.route('/logout')
+def logout():
+    session.clear()
+    return redirect('/')
+
+@app.route('/get-playlists', methods=['GET'])
+def get_playlists():
+    try:
+        port = request.host.split(':')[-1] if ':' in request.host else DEFAULT_PORT
+        port = int(port)
+        sp = get_spotify_client()
+        if sp is None:
+            return jsonify({'success': False, 'error': 'Not authenticated'})
+        playlists = []
+        results = sp.current_user_playlists()
+        
+        while results:
+            for playlist in results['items']:
+                playlists.append({
+                    'id': playlist['id'],
+                    'name': playlist['name'],
+                    'tracks_total': playlist['tracks']['total']
+                })
+            
+            if results['next']:
+                results = sp.next(results)
+            else:
+                break
+        
+        return jsonify({'success': True, 'playlists': playlists})
+    except Exception as e:
+        return jsonify({'success': False, 'error': f"get playlists error: {str(e)}"})
+
+@app.route('/get-releases', methods=['POST'])
+def get_releases():
+    try:
+        weeks_back = int(request.json.get('weeks', 2))
+        album_types = request.json.get('albumTypes', ['album', 'single', 'compilation'])
+        sp = get_spotify_client()
+        if sp is None:
+            return jsonify({'success': False, 'error': 'Not authenticated'})
+        releases = get_recent_releases(sp, weeks_back, album_types)
+        return jsonify({'success': True, 'releases': releases})
+    except Exception as e:
+        return jsonify({'success': False, 'error': f"get releases error: {str(e)}, weeks: {weeks_back}, albumTypes: {album_types}"})
+
+@app.route('/create-playlist', methods=['POST'])
+def make_playlist():
+    try:
+        track_ids = request.json.get('trackIds', [])
+        weeks_back = int(request.json.get('weeks', 2))
+        playlist_id = request.json.get('playlistId')
+        playlist_name = request.json.get('playlistName')
+        
+        sp = get_spotify_client()
+        if sp is None:
+            return jsonify({'success': False, 'error': 'Not authenticated'})
+        playlist_url = create_playlist(sp, track_ids, weeks_back, playlist_name, playlist_id)
+        return jsonify({'success': True, 'playlistUrl': playlist_url})
+    except Exception as e:
+        return jsonify({'success': False, 'error': f"create playlist error: {str(e)}"})
 
 def get_recent_releases(sp, weeks_back=2, album_types=None):
     """Get albums released in the last X weeks from followed artists"""
@@ -89,61 +198,6 @@ def get_recent_releases(sp, weeks_back=2, album_types=None):
             break
     
     return sorted(recent_releases, key=lambda x: x['release_date'], reverse=True)
-
-@app.route('/')
-def index():
-    return render_template('index.html')
-
-@app.route('/get-playlists', methods=['GET'])
-def get_playlists():
-    try:
-        port = request.host.split(':')[-1] if ':' in request.host else DEFAULT_PORT
-        port = int(port)
-        sp = get_spotify_client()
-        playlists = []
-        results = sp.current_user_playlists()
-        
-        while results:
-            for playlist in results['items']:
-                playlists.append({
-                    'id': playlist['id'],
-                    'name': playlist['name'],
-                    'tracks_total': playlist['tracks']['total']
-                })
-            
-            if results['next']:
-                results = sp.next(results)
-            else:
-                break
-        
-        return jsonify({'success': True, 'playlists': playlists})
-    except Exception as e:
-        return jsonify({'success': False, 'error': f"get playlists error: {str(e)}"})
-
-@app.route('/get-releases', methods=['POST'])
-def get_releases():
-    try:
-        weeks_back = int(request.json.get('weeks', 2))
-        album_types = request.json.get('albumTypes', ['album', 'single', 'compilation'])
-        sp = get_spotify_client()
-        releases = get_recent_releases(sp, weeks_back, album_types)
-        return jsonify({'success': True, 'releases': releases})
-    except Exception as e:
-        return jsonify({'success': False, 'error': f"get releases error: {str(e)}, weeks: {weeks_back}, albumTypes: {album_types}"})
-
-@app.route('/create-playlist', methods=['POST'])
-def make_playlist():
-    try:
-        track_ids = request.json.get('trackIds', [])
-        weeks_back = int(request.json.get('weeks', 2))
-        playlist_id = request.json.get('playlistId')
-        playlist_name = request.json.get('playlistName')
-        
-        sp = get_spotify_client()
-        playlist_url = create_playlist(sp, track_ids, weeks_back, playlist_name, playlist_id)
-        return jsonify({'success': True, 'playlistUrl': playlist_url})
-    except Exception as e:
-        return jsonify({'success': False, 'error': f"create playlist error: {str(e)}"})
 
 def create_playlist(sp, track_ids, weeks_back, playlist_name=None, playlist_id=None):
     """Create a new playlist or update existing one with tracks"""

@@ -25,70 +25,86 @@
 </head>
 <body class="bg-gray-900 text-white min-h-screen">
     <div class="container mx-auto px-4 py-8">
-        <h1 class="text-4xl font-bold mb-8 text-center">Spotify Recent Releases</h1>
+        <div class="flex justify-between items-center mb-8">
+            <h1 class="text-4xl font-bold">Spotify Recent Releases</h1>
+            {% if authenticated %}
+                <a href="/logout" class="text-gray-400 hover:text-white">Logout</a>
+            {% endif %}
+        </div>
         
         <div class="max-w-2xl mx-auto">
             <!-- Message container at the top -->
             <div id="messageContainer" class="mb-4"></div>
 
-            <div class="bg-gray-800 rounded-lg p-6 shadow-lg">
-                <div class="mb-6">
-                    <label for="weeks" class="block text-sm font-medium mb-2">Number of weeks to look back:</label>
-                    <input type="number" id="weeks" min="1" max="52" value="2" 
-                           class="w-full px-4 py-2 rounded bg-gray-700 border border-gray-600 focus:outline-none focus:border-green-500">
+            {% if not authenticated %}
+                <div class="bg-gray-800 rounded-lg p-6 shadow-lg text-center">
+                    <h2 class="text-2xl mb-4">Welcome!</h2>
+                    <p class="mb-6">Please log in with your Spotify account to use this app.</p>
+                    <a href="/login" class="spotify-green text-white px-8 py-3 rounded-full font-medium hover:shadow-lg transition duration-200 inline-block">
+                        Login with Spotify
+                    </a>
                 </div>
-
-                <div class="mb-6">
-                    <label class="block text-sm font-medium mb-2">Include release types:</label>
-                    <div class="space-y-2">
-                        <label class="flex items-center space-x-2">
-                            <input type="checkbox" id="typeAlbum" checked
-                                   class="w-4 h-4 rounded bg-gray-700 border-gray-600 text-green-500 focus:ring-green-500 focus:ring-offset-gray-800">
-                            <span>Albums</span>
-                        </label>
-                        <label class="flex items-center space-x-2">
-                            <input type="checkbox" id="typeSingle" checked
-                                   class="w-4 h-4 rounded bg-gray-700 border-gray-600 text-green-500 focus:ring-green-500 focus:ring-offset-gray-800">
-                            <span>Singles</span>
-                        </label>
-                        <label class="flex items-center space-x-2">
-                            <input type="checkbox" id="typeCompilation" checked
-                                   class="w-4 h-4 rounded bg-gray-700 border-gray-600 text-green-500 focus:ring-green-500 focus:ring-offset-gray-800">
-                            <span>Compilations</span>
-                        </label>
-                    </div>
-                </div>
-
-                <div class="flex space-x-4 mb-6">
-                    <button id="getTracksBtn" class="flex-1 spotify-green text-white px-6 py-2 rounded-full font-medium hover:shadow-lg transition duration-200">
-                        Get Track List
-                    </button>
-                </div>
-
-                <div id="playlistSection" class="mb-6 hidden">
-                    <div class="flex items-center space-x-4">
-                        <select id="playlistSelect" 
-                                class="flex-1 px-4 py-2 rounded bg-gray-700 border border-gray-600 focus:outline-none focus:border-green-500">
-                            <option value="new">Create New Playlist</option>
-                        </select>
-                        <button id="updatePlaylistBtn" 
-                                class="spotify-green text-white px-6 py-2 rounded-full font-medium hover:shadow-lg transition duration-200">
-                            Update Playlist
-                        </button>
-                    </div>
-                    
-                    <div id="newPlaylistNameContainer" class="mt-4">
-                        <input type="text" id="newPlaylistName" 
-                               placeholder="Enter new playlist name"
+            {% else %}
+                <div class="bg-gray-800 rounded-lg p-6 shadow-lg">
+                    <div class="mb-6">
+                        <label for="weeks" class="block text-sm font-medium mb-2">Number of weeks to look back:</label>
+                        <input type="number" id="weeks" min="1" max="52" value="2" 
                                class="w-full px-4 py-2 rounded bg-gray-700 border border-gray-600 focus:outline-none focus:border-green-500">
                     </div>
-                </div>
 
-                <div id="results" class="space-y-4"></div>
-            </div>
+                    <div class="mb-6">
+                        <label class="block text-sm font-medium mb-2">Include release types:</label>
+                        <div class="space-y-2">
+                            <label class="flex items-center space-x-2">
+                                <input type="checkbox" id="typeAlbum" checked
+                                       class="w-4 h-4 rounded bg-gray-700 border-gray-600 text-green-500 focus:ring-green-500 focus:ring-offset-gray-800">
+                                <span>Albums</span>
+                            </label>
+                            <label class="flex items-center space-x-2">
+                                <input type="checkbox" id="typeSingle" checked
+                                       class="w-4 h-4 rounded bg-gray-700 border-gray-600 text-green-500 focus:ring-green-500 focus:ring-offset-gray-800">
+                                <span>Singles</span>
+                            </label>
+                            <label class="flex items-center space-x-2">
+                                <input type="checkbox" id="typeCompilation" checked
+                                       class="w-4 h-4 rounded bg-gray-700 border-gray-600 text-green-500 focus:ring-green-500 focus:ring-offset-gray-800">
+                                <span>Compilations</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="flex space-x-4 mb-6">
+                        <button id="getTracksBtn" class="flex-1 spotify-green text-white px-6 py-2 rounded-full font-medium hover:shadow-lg transition duration-200">
+                            Get Track List
+                        </button>
+                    </div>
+
+                    <div id="playlistSection" class="mb-6 hidden">
+                        <div class="flex items-center space-x-4">
+                            <select id="playlistSelect" 
+                                    class="flex-1 px-4 py-2 rounded bg-gray-700 border border-gray-600 focus:outline-none focus:border-green-500">
+                                <option value="new">Create New Playlist</option>
+                            </select>
+                            <button id="updatePlaylistBtn" 
+                                    class="spotify-green text-white px-6 py-2 rounded-full font-medium hover:shadow-lg transition duration-200">
+                                Update Playlist
+                            </button>
+                        </div>
+                        
+                        <div id="newPlaylistNameContainer" class="mt-4">
+                            <input type="text" id="newPlaylistName" 
+                                   placeholder="Enter new playlist name"
+                                   class="w-full px-4 py-2 rounded bg-gray-700 border border-gray-600 focus:outline-none focus:border-green-500">
+                        </div>
+                    </div>
+
+                    <div id="results" class="space-y-4"></div>
+                </div>
+            {% endif %}
         </div>
     </div>
 
+    {% if authenticated %}
     <script>
         let trackIds = [];
         const getTracksBtn = document.getElementById('getTracksBtn');
@@ -121,6 +137,10 @@
             
             // Scroll to top if needed
             window.scrollTo({ top: 0, behavior: 'smooth' });
+
+            if (type === 'error' && message.includes('Not authenticated')) {
+                setTimeout(() => window.location.href = '/login', 2000);
+            }
         }
 
         function getSelectedAlbumTypes() {
@@ -153,6 +173,8 @@
                         option.textContent = `${playlist.name} (${playlist.tracks_total} tracks)`;
                         playlistSelect.appendChild(option);
                     });
+                } else if (data.error === 'Not authenticated') {
+                    showMessage('Session expired. Redirecting to login...', 'error');
                 }
             } catch (error) {
                 console.error('Error loading playlists:', error);
@@ -199,40 +221,35 @@
                     if (data.releases.length === 0) {
                         showMessage('No new releases found in the specified time period.', 'error');
                     } else {
-                        const filteredReleases = data.releases.filter(release => 
-                            getSelectedAlbumTypes().includes(release.album_type)
-                        );
-                        
-                        if (filteredReleases.length === 0) {
-                            showMessage('No releases found for the selected types.', 'error');
-                        } else {
-                            filteredReleases.forEach(release => {
-                                const releaseDiv = document.createElement('div');
-                                releaseDiv.className = 'bg-gray-700 p-4 rounded-lg';
-                                releaseDiv.innerHTML = `
-                                    <div class="flex justify-between items-start">
-                                        <div>
-                                            <h3 class="font-semibold text-lg">${release.artist_name}</h3>
-                                            <p class="text-green-400">${release.album_name}</p>
-                                            <p class="text-sm text-gray-400">Released: ${release.release_date}</p>
-                                            <p class="text-sm text-gray-400">Type: ${release.album_type.charAt(0).toUpperCase() + release.album_type.slice(1)}</p>
-                                            <p class="text-sm mt-2">Top Track: ${release.top_track.name}</p>
-                                        </div>
-                                        <a href="${release.url}" target="_blank" 
-                                           class="text-green-400 hover:text-green-300 text-sm">
-                                            Open in Spotify
-                                        </a>
+                        data.releases.forEach(release => {
+                            const releaseDiv = document.createElement('div');
+                            releaseDiv.className = 'bg-gray-700 p-4 rounded-lg';
+                            releaseDiv.innerHTML = `
+                                <div class="flex justify-between items-start">
+                                    <div>
+                                        <h3 class="font-semibold">${release.album_name}</h3>
+                                        <p class="text-gray-400">${release.artist_name}</p>
+                                        <p class="text-sm text-gray-500">
+                                            Released: ${release.release_date} | 
+                                            Type: ${release.album_type}
+                                        </p>
+                                        <p class="text-sm text-gray-400 mt-2">
+                                            Top Track: ${release.top_track.name} 
+                                            (Popularity: ${release.top_track.popularity})
+                                        </p>
                                     </div>
-                                `;
-                                resultsDiv.appendChild(releaseDiv);
-                            });
-                            
-                            // Show playlist section if we have tracks
-                            if (trackIds.length > 0) {
-                                playlistSection.classList.remove('hidden');
-                            }
-                        }
+                                    <a href="${release.url}" target="_blank" 
+                                       class="text-green-500 hover:text-green-400">
+                                        Open in Spotify
+                                    </a>
+                                </div>
+                            `;
+                            resultsDiv.appendChild(releaseDiv);
+                        });
+                        playlistSection.classList.remove('hidden');
                     }
+                } else if (data.error === 'Not authenticated') {
+                    showMessage('Session expired. Redirecting to login...', 'error');
                 } else {
                     showMessage(`Error: ${data.error}`, 'error');
                 }
@@ -246,6 +263,11 @@
 
         updatePlaylistBtn.addEventListener('click', async () => {
             try {
+                if (trackIds.length === 0) {
+                    showMessage('No tracks selected. Please get the track list first.', 'error');
+                    return;
+                }
+
                 const playlistId = playlistSelect.value === 'new' ? null : playlistSelect.value;
                 const playlistName = playlistId ? null : newPlaylistName.value.trim();
                 
@@ -263,25 +285,30 @@
                         'Content-Type': 'application/json',
                     },
                     body: JSON.stringify({
-                        trackIds: trackIds,
+                        trackIds,
                         weeks: parseInt(weeksInput.value),
-                        playlistId: playlistId,
-                        playlistName: playlistName
+                        playlistId,
+                        playlistName
                     })
                 });
 
                 const data = await response.json();
                 
                 if (data.success) {
-                    showMessage(`
-                        <div class="flex justify-between items-center">
-                            <span>${playlistId ? 'Playlist updated' : 'New playlist created'} successfully!</span>
-                            <a href="${data.playlistUrl}" target="_blank" 
-                               class="text-green-400 hover:text-green-300 ml-4">
-                                Open in Spotify →
-                            </a>
-                        </div>
-                    `, 'success');
+                    const action = playlistId ? 'updated' : 'created';
+                    showMessage(
+                        `Playlist ${action}! <a href="${data.playlistUrl}" target="_blank" class="text-green-500 hover:text-green-400">Open in Spotify</a>`,
+                        'success'
+                    );
+                    
+                    // Reload playlists if we created a new one
+                    if (!playlistId) {
+                        playlistSelect.innerHTML = '<option value="new">Create New Playlist</option>';
+                        await loadPlaylists();
+                        newPlaylistName.value = '';
+                    }
+                } else if (data.error === 'Not authenticated') {
+                    showMessage('Session expired. Redirecting to login...', 'error');
                 } else {
                     showMessage(`Error: ${data.error}`, 'error');
                 }
@@ -293,5 +320,6 @@
             }
         });
     </script>
+    {% endif %}
 </body>
 </html>
