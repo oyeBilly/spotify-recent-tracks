@@ -117,16 +117,13 @@ def get_playlists():
 @app.route('/get-releases', methods=['POST'])
 def get_releases():
     try:
-        port = request.host.split(':')[-1] if ':' in request.host else DEFAULT_PORT
-        port = int(port)
-        print(f"port is {port}")
         weeks_back = int(request.json.get('weeks', 2))
         album_types = request.json.get('albumTypes', ['album', 'single', 'compilation'])
         sp = get_spotify_client()
         releases = get_recent_releases(sp, weeks_back, album_types)
         return jsonify({'success': True, 'releases': releases})
     except Exception as e:
-        return jsonify({'success': False, 'error': f"get releases error: {str(e)}"})
+        return jsonify({'success': False, 'error': f"get releases error: {str(e)}, weeks: {weeks_back}, albumTypes: {album_types}"})
 
 @app.route('/create-playlist', methods=['POST'])
 def make_playlist():
