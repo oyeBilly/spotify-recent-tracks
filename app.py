@@ -17,6 +17,12 @@ app = Flask(__name__)
 # Spotify API credentials
 SPOTIPY_CLIENT_ID = os.getenv('SPOTIPY_CLIENT_ID')
 SPOTIPY_CLIENT_SECRET = os.getenv('SPOTIPY_CLIENT_SECRET')
+
+if SPOTIPY_CLIENT_ID is None:
+    print("Please set SPOTIPY_CLIENT_ID environment variable")
+
+if SPOTIPY_CLIENT_SECRET is None:
+    print("Please set SPOTIPY_CLIENT_SECRET environment variable")
 DEFAULT_PORT = 5000
 
 def get_redirect_uri(port=DEFAULT_PORT):
